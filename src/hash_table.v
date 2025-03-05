@@ -89,16 +89,17 @@ module tt_um_save_buffer_hash_table (
 		   cmd <= cmd_in;
 		   
 		   if(go_ok && go_in) begin
-		       $display("GO");
+		       $display("GO key=%b, val=%b, hash=%b cmd=%b", key, val, hash, cmd);
 		       go_ok <= 0;
 		       go <= 1;
 		       state <= STATE_WAITING;
 		   end
 	       end
 	       STATE_WAITING: begin
-		   if (status != 3) begin
-		       $display("NOGO");
-		       go <= 0;
+		   if (go && status == 3)
+		     go <= 0;
+		   else if (status != 3) begin
+		       $display("GOING IDLE");
 		       state <= STATE_IDLE;
 		   end
 	       end
