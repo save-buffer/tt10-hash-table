@@ -16,10 +16,14 @@ module probing_mem (
     output reg [1:0]  status,
     output reg [3:0]  out
 );
-   
    reg [8:0]   mem[0:7];
    reg [3:0]   cursor;
    reg 	       state;
+
+   reg 	       go_ok; // To make sure user brings `go` low between requests
+   reg [3:0]   key_saved;
+   reg [3:0]   val_saved;
+   reg [2:0]   hash_saved;
 
    integer     i;
 
@@ -40,49 +44,52 @@ module probing_mem (
 	   for (i = 0; i < 8; i = i + 1) begin
 	       mem[i] <= 0;
 	   end
+	   key_saved <= 0;
+	   val_saved <= 0;
+	   hash_saved <= 0;
 	   cursor <= 0;
+	   go_ok <= 1;
 	   state <= STATE_IDLE;
 	   status <= STATUS_OK;
 	   out <= 0;
        end
        else begin
-	   $display("status=%b", status);
 	   case (state)
 	       STATE_IDLE: begin
-		   if (go) begin
+		   if (!go && !go_ok) begin
+		       go_ok <= 1;
+		   end
+		   else if (go && go_ok) begin
+		       key_saved <= key;
+		       val_saved <= val;
+		       hash_saved <= hash;
 		       cursor <= {1'b0, hash[2:0]};
 		       state <= STATE_PROBING;
 		       status <= STATUS_BUSY;
-		       $display("probing");
+		       go_ok <= 0;
 		   end
 	       end
 	       STATE_PROBING: begin
-		   $display("cursor %b has cell %b, cmd=%b", cursor, mem[cursor[2:0]], cmd);
-		   $display("mem[cursor[2:0]][8]=%b, mem[cursor[2:0]][7:4]=%b, key=%b", mem[cursor[2:0]][8], mem[cursor[2:0]][7:4], key);
-		   
-		   if (cursor[3] && cursor[2:0] == hash[2:0]) begin // Did a full loop
-		       $display("not found");
+		   if (cursor[3] && cursor[2:0] == hash_saved[2:0]) begin // Did a full loop
 		       status <= cmd == CMD_INSERT ? STATUS_FULL : STATUS_NOTFOUND;
 		       state <= STATE_IDLE;
 		   end
-		   else if ((cmd == CMD_LOOKUP || cmd == CMD_DELETE) && mem[cursor[2:0]][8] && mem[cursor[2:0]][7:4] == key) begin // Found the key!
-		       $display("found");
+		   else if ((cmd == CMD_LOOKUP || cmd == CMD_DELETE) && mem[cursor[2:0]][8] && mem[cursor[2:0]][7:4] == key_saved) begin // Found the key!
 		       out <= mem[cursor[2:0]][3:0];
 		       if (cmd == CMD_DELETE)
 			 mem[cursor[2:0]][8] <= 0;
 		       state <= STATE_IDLE;
 		       status <= STATUS_OK;
 		   end
-		   else if (cmd == CMD_INSERT && (!mem[cursor[2:0]][8] || mem[cursor[2:0]][7:4] == key)) begin // Found an empty slot
-		       $display("inserted key %b at index %b", key, cursor);
+		   else if (cmd == CMD_INSERT && (!mem[cursor[2:0]][8] || mem[cursor[2:0]][7:4] == key_saved)) begin // Found an empty slot
 		       mem[cursor[2:0]][8] <= 1;
-		       mem[cursor[2:0]][7:4] <= key;
-		       mem[cursor[2:0]][3:0] <= val;
+		       mem[cursor[2:0]][7:4] <= key_saved;
+		       mem[cursor[2:0]][3:0] <= val_saved;
+		       out <= mem[cursor[2:0]][3:0];
 		       state <= STATE_IDLE;
 		       status <= STATUS_OK;
 		   end
 		   else begin
-		       $display("advancing from cursor=%b", cursor);
 		       cursor <= cursor + 1;
 		   end
 	       end

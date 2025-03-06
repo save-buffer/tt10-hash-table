@@ -97,5 +97,31 @@ async def test_project(dut):
     await lookup(dut, 0x6)
     assert status(dut) == STATUS_NOTFOUND
 
+    await insert(dut, 0x4, 0x3)
+    assert status(dut) == STATUS_OK
+    assert val(dut) == 0x2
+
+    await lookup(dut, 0x4)
+    assert status(dut) == STATUS_OK
+    assert val(dut) == 0x3
+
+    for i in range(8):
+        await insert(dut, i, i)
+        assert status(dut) == STATUS_OK
+
+    await insert(dut, 0xF, 0xF)
+    assert status(dut) == STATUS_FULL
+    
+    await delete(dut, 0x5)
+    assert status(dut) == STATUS_OK
+    assert val(dut) == 0x5
+
+    await insert(dut, 0xF, 0xF)
+    assert status(dut) == STATUS_OK
+
+    await lookup(dut, 0xF)
+    assert status(dut) == STATUS_OK
+    assert val(dut) == 0xF
+
     # Keep testing the module by changing the input values, waiting for
     # one or more clock cycles, and asserting the expected output values.
